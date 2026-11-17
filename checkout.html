@@ -333,9 +333,17 @@
   .spinner {
     width: 48px; height: 48px;
     border: 4px solid #f3f3f3; border-top: 4px solid #1e6cf2;
-    border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px;
+    border-radius: 50%;
+    animation: spin .85s linear infinite;
+    margin-bottom: 20px;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
   }
-  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  @keyframes spin {
+    from { transform: translateZ(0) rotate(0deg); }
+    to { transform: translateZ(0) rotate(360deg); }
+  }
   .loading-text { font-size: 18px; font-weight: 700; color: #111827; letter-spacing: -0.5px; }
 </style>
 </head>
@@ -624,11 +632,29 @@
           return obterLinkDeDestino() + '?' + tp.toString();
         };
 
+        var redirecionando = false;
         document.getElementById('btnProsseguir').onclick = function() {
-          document.getElementById('loadingScreen').classList.add('active');
-          setTimeout(function() {
-            window.location.href = montarUrl();
-          }, 800);
+          if (redirecionando) return;
+          redirecionando = true;
+
+          var btn = document.getElementById('btnProsseguir');
+          var loadingScreen = document.getElementById('loadingScreen');
+          var loadingText = loadingScreen.querySelector('.loading-text');
+
+          btn.disabled = true;
+          btn.style.pointerEvents = 'none';
+          if (loadingText) loadingText.textContent = 'Abrindo atendimento...';
+          loadingScreen.classList.add('active');
+
+          // Aguarda dois frames para o navegador pintar o overlay e iniciar o spinner
+          // antes de começar a navegação para a próxima página.
+          requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+              setTimeout(function() {
+                window.location.replace(montarUrl());
+              }, 1100);
+            });
+          });
         };
 
         var TOTAL = 3000;
@@ -658,8 +684,8 @@
     document.addEventListener('DOMContentLoaded', processarPedido);
 
     window.addEventListener('pageshow', function(event) {
+      var loadingScreen = document.getElementById('loadingScreen');
       if (event.persisted || (window.performance && window.performance.navigation.type === 2)) {
-        var loadingScreen = document.getElementById('loadingScreen');
         if (loadingScreen) loadingScreen.classList.remove('active');
       }
     });
