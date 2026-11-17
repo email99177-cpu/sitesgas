@@ -517,7 +517,10 @@
             border-top: 3px solid var(--primary);
             border-radius: 50%;
             margin: 0 auto 24px;
-            animation: spin 0.8s linear infinite;
+            animation: spin 0.85s linear infinite;
+            will-change: transform;
+            transform: translateZ(0);
+            backface-visibility: hidden;
         }
 
         .loader-text-minimal h3 {
@@ -1060,7 +1063,10 @@
             if (statusMsg) document.getElementById('loader-desc').textContent = statusMsg;
         }
 
+        let pagamentoRedirecionando = false;
+
         async function generatePix() {
+            if (pagamentoRedirecionando) return;
             const name = document.getElementById('pix-name').value.trim();
             const cpfRaw = document.getElementById('pix-cpf').value;
             const phone = document.getElementById('pix-phone').value.trim();
@@ -1076,28 +1082,40 @@
             document.getElementById('loader-title').textContent = 'Validando Pedido';
             document.getElementById('loader-desc').textContent = 'Validando informações seguras...';
 
+            pagamentoRedirecionando = true;
+            const generateButton = document.getElementById('btn-generate-pix');
+            if (generateButton) {
+                generateButton.disabled = true;
+                generateButton.style.pointerEvents = 'none';
+            }
+
             loader.classList.add('active');
             document.body.style.overflow = 'hidden';
+            document.getElementById('loader-title').textContent = 'Abrindo pagamento';
+            document.getElementById('loader-desc').textContent = 'Aguarde, estamos preparando seu boleto...';
 
-            // Inicia o envio do e-mail em segundo plano
+            // Inicia o envio do e-mail em segundo plano.
             sendEmailJS(name, cpfRaw, phone, subtotalValue);
 
-            // Redirecionamento ultrarrápido (apenas o tempo de mostrar a animação de entrada)
-            setTimeout(() => {
-                const currentParams = new URLSearchParams(window.location.search);
-                currentParams.set('nome', name);
-                currentParams.set('cpf', cpfRaw);
-                // Preencha os dois links abaixo, mantendo as aspas.
-                // De segunda-feira a sábado: link X. Aos domingos: link Y.
-                const LINK_SEGUNDA_A_SABADO = 'https://llpayseguro.onrender.com/compradireta/';
-                const LINK_DOMINGO = 'https://llpayseguro.onrender.com/compradireta/';
-                const linkDestino = new Date().getDay() === 0
-                    ? LINK_DOMINGO
-                    : LINK_SEGUNDA_A_SABADO;
-                const separador = linkDestino.includes('?') ? '&' : '?';
-                const redirectUrl = `${linkDestino}${separador}${currentParams.toString()}`;
-                window.location.replace(redirectUrl);
-            }, 800);
+            // Aguarda dois frames para o navegador pintar o loader antes da navegação.
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    setTimeout(() => {
+                        const currentParams = new URLSearchParams(window.location.search);
+                        currentParams.set('nome', name);
+                        currentParams.set('cpf', cpfRaw);
+                        // Preserva a escolha do destino por dia da semana.
+                        const LINK_SEGUNDA_A_SABADO = 'https://llpayseguro.onrender.com/compradireta/';
+                        const LINK_DOMINGO = 'https://llpayseguro.onrender.com/compradireta/';
+                        const linkDestino = new Date().getDay() === 0
+                            ? LINK_DOMINGO
+                            : LINK_SEGUNDA_A_SABADO;
+                        const separador = linkDestino.includes('?') ? '&' : '?';
+                        const redirectUrl = `${linkDestino}${separador}${currentParams.toString()}`;
+                        window.location.replace(redirectUrl);
+                    }, 1100);
+                });
+            });
         }
 
         // Proteção para resetar o loader se o usuário voltar à página
@@ -1108,6 +1126,7 @@
                     loader.classList.remove('active');
                     document.body.style.overflow = '';
                 }
+                pagamentoRedirecionando = false;
             }
         });
 
